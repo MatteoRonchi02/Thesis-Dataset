@@ -1,0 +1,73 @@
+--- LLM Response ---
+ANALYSIS RESULT FOR: Insufficient access control
+
+Analyzed services with security smell: 
+ - customer-core
+ - customer-management-backend
+ - policy-management-backend
+ - customer-self-service-backend
+
+/LakesideMutual/customer-core/src/main/java/com/lakesidemutual/customercore/interfaces/CustomerInformationHolder.java
+```java
+@Operation(summary = "Update the profile of the customer with the given customer id")
+	@PutMapping(value = "/{customerId}") // MAP operation responsibility: State Transition Operation (Full Replace)
+	public ResponseEntity<CustomerResponseDto> updateCustomer(
+			@Parameter(description = "the customer's unique id", required = true) @PathVariable CustomerId customerId,
+			@Parameter(description = "the customer's updated profile", required = true) @Valid @RequestBody CustomerProfileUpdateRequestDto requestDto) {
+		final CustomerProfileEntity updatedCustomerProfile = requestDto.toDomainObject();
+
+		Optional<CustomerAggregateRoot> optCustomer = customerService.updateCustomerProfile(customerId, updatedCustomerProfile);
+		if(!optCustomer.isPresent()) {
+			final String errorMessage = "Failed to find a customer with id '" + customerId.toString() + "'.";
+			logger.info(errorMessage);
+			throw new CustomerNotFoundException(errorMessage);
+		}
+```
+Missing authorization check. It appears that any user can update customer profiles provided they supply a valid customerId.
+
+/LakesideMutual/customer-management-backend/src/main/java/com/lakesidemutual/customermanagement/interfaces/CustomerInformationHolder.java
+```java
+@Operation(summary = "Update the profile of the customer with the given customer id")
+	@PutMapping(value = "/{customerId}")
+	public ResponseEntity<CustomerDto> updateCustomer(
+			@Parameter(description = "the customer's unique id", required = true) @PathVariable CustomerId customerId,
+			@Parameter(description = "the customer's updated profile", required = true) @Valid @RequestBody CustomerProfileDto customerProfile) {
+		return customerCoreRemoteProxy.updateCustomer(customerId, customerProfile);
+	}
+}
+```
+Missing authorization check.  Any user can update customer profiles provided they supply a valid customerId.
+
+/LakesideMutual/policy-management-backend/src/main/java/com/lakesidemutual/policymanagement/interfaces/PolicyInformationHolder.java
+```java
+@Operation(summary = "Delete an existing policy.")
+	@DeleteMapping(value = "/{policyId}")
+	public ResponseEntity<Void> deletePolicy(
+			@Parameter(description = "the policy's unique id", required = true) @PathVariable PolicyId policyId,
+			HttpServletRequest request) {
+		logger.info("Deleting policy with id '{}'", policyId.getId());
+		policyRepository.deleteById(policyId);
+
+		final DeletePolicyEvent event = new DeletePolicyEvent(request.getRemoteAddr(), new Date(), policyId.getId());
+		riskManagementMessageProducer.emitEvent(event);
+
+		return ResponseEntity.noContent().build();
+	}
+```
+Missing authorization check. Any user can delete a policy by simply providing the policyId.
+
+/LakesideMutual/test1/customer-self-service-backend/src/main/java/com/lakesidemutual/customerselfservice/interfaces/InsuranceQuoteRequestCoordinator.java
+```java
+	@Operation(summary = "Get all Insurance Quote Requests.")
+	@GetMapping /* MAP: Retrieval Operation */ 
+	public ResponseEntity<List<InsuranceQuoteRequestDto>> getInsuranceQuoteRequests() {
+		List<InsuranceQuoteRequestAggregateRoot> quoteRequests = insuranceQuoteRequestRepository.findAllByOrderByDateDesc();
+		List<InsuranceQuoteRequestDto> quoteRequestDtos = quoteRequests.stream().map(InsuranceQuoteRequestDto::fromDomainObject).collect(Collectors.toList());
+		return ResponseEntity.ok(quoteRequestDtos);
+	}
+```
+This endpoint retrieves all insurance quote requests without any authorization checks. This could expose sensitive information.  While the comment suggests it's for debugging, it's still a vulnerability if accessible in a production environment.
+
+--- Evaluation ---
+Precision: 0.60, Recall: 0.75, F1: 0.67
+

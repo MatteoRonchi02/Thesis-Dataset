@@ -1,0 +1,83 @@
+
+#SPECIFIC SMELL SECTION
+SMELL INSTRUCTIONS = {
+    "hardcoded secrets": """
+Look specifically for:
+- Passwords, API keys, secrets or tokens written in code or configs.
+- Environment variables or JSON keys like "password", "secret", "token", etc.
+- Credentials exposed in `application.properties`, `.env`, `.json`, or code.
+
+Do NOT flag:
+- Configurations that read from environment variables (e.g., @Value "\${apikey.value}").
+- Placeholder values like `<password>` or `"***"` unless clearly real.
+""",
+
+    "publicly accessible microservice": """
+Look specifically for:
+- Services exposing ports via Docker or Kubernetes (e.g., "8080:8080", NodePort, LoadBalancer).
+- Bindings to 0.0.0.0 or localhost where not appropriate.
+- Services exposing internal tools like ActiveMQ, Redis, or databases.
+
+Do NOT flag:
+- Legitimately exposed public frontends behind an API Gateway.
+""",
+
+    "unauthenticated traffic": """
+Look specifically for:
+- Services that use HTTP instead of HTTPS in internal or external communication.
+- Endpoints or services with no authentication mechanism.
+- Lack of authorization headers or session validation in frontend/backend flows.
+
+Do NOT flag:
+- Endpoints that are clearly behind an auth gateway.
+""",
+
+    "insufficient access control": """
+Look specifically for:
+- REST endpoints that expose sensitive operations without checking roles or permissions.
+- Lack of use of access control annotations (e.g., @PreAuthorize, @RolesAllowed).
+- No middleware/auth layer on critical routes.
+
+Do NOT flag:
+- Public resources clearly meant to be exposed (e.g., `/login`, `/docs`).
+"""
+}
+
+#GENERIC SECTION
+Instructions:
+1. You are an security software expert. Your task is to analyze specific code snippets for a given [Smell name].
+2. The 'Smell Definition' provides the official description for the [Smell name] smell.
+3. The 'Positive Examples' are code snippets that represent good practices and do NOT manifest the smell.
+4. The 'Suspicious Code Snippets' are chunks of code from a user's project that are suspected to contain the smell.
+5. Your primary goal is to analyze EACH suspicious snippet and determine if it is affected by the defined smell, using positive examples for comparison.
+6. Structure your answer as follows:
+   - Start with a clear verdict: "ANALYSIS RESULT FOR: [Smell Name]".
+   - List ALL the services that contain at least one confirmed instance of this smell. Format:
+    "Analyzed services with security smell:
+    - service-name-1
+    - service-name-2"
+    If no services are affected, return:
+    "Analyzed services with security smell: []"
+   - For each analyzed file, create a section, divided by a line of #.
+   - Under each file, list the snippets that ARE VULNERABLE.
+   - For each vulnerable snippet, provide:
+     a. The snippet of code or that contains the smell.
+     b. A clear and exhaustive explanation of WHY it is a vulnerability in this context.
+     c. An actionable suggestions on how to refactor the code to resolve the security smell.
+   - If a snippet is NOT vulnerable, you don't need to mention it.
+   - If, after analyzing all provided snippets, you find NO vulnerabilities, state clearly: "No instances of the '[Smell Name]' smell were found in the provided code snippets."
+
+--- Smell Definition ---
+{smell_definition}
+
+--- Smell-specific detection instructions ---
+{smell_specific_instructions}
+
+--- Positive Examples (without smell) ---
+{positive_examples}
+
+--- Suspicious Code Snippets from Provided Folder ---
+{additional_folder_context}
+
+Answer (in the same language as the Question):
+
